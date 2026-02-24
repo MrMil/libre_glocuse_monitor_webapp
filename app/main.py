@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from contextlib import asynccontextmanager
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -23,9 +27,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 POLL_INTERVAL_SECONDS = 60
-
-app = FastAPI(title="Sugar Monitor")
-templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 _cached_thresholds: GlucoseThresholds | None = None
 
@@ -49,15 +50,17 @@ async def _background_poller() -> None:
         await asyncio.sleep(POLL_INTERVAL_SECONDS)
 
 
-_background_task: asyncio.Task[None] | None = None
-
-
-@app.on_event("startup")
-async def startup() -> None:
-    global _background_task
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     init_db()
     await asyncio.to_thread(_poll_and_store)
-    _background_task = asyncio.create_task(_background_poller())
+    task = asyncio.create_task(_background_poller())
+    yield
+    task.cancel()
+
+
+app = FastAPI(title="Sugar Monitor", lifespan=lifespan)
+templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 
 @app.get("/", response_class=HTMLResponse)

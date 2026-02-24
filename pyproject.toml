@@ -15,8 +15,13 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "anyio>=4.12.1",
+    "httpx>=0.28.1",
     "mypy>=1.19.1",
     "pre-commit>=4.5.1",
+    "pytest>=9.0.2",
+    "pytest-anyio>=0.0.0",
+    "pytest-cov>=7.0.0",
     "ruff>=0.15.2",
     "types-requests>=2.32.4.20260107",
 ]
@@ -47,3 +52,6 @@ warn_unused_configs = true
 [[tool.mypy.overrides]]
 module = ["pylibrelinkup.*"]
 ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
