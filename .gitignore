@@ -6,6 +6,6 @@ __pycache__/
 .coverage
 .pytest_cache/
 node_modules/
-sugar.db
+sugar.db*
 .vscode/
 server/

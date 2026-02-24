@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.db import get_all_readings, init_db, upsert_readings
+from app.db import get_all_readings, get_readings_in_range, init_db, upsert_readings
 from app.libre import (
     GlucoseThresholds,
     GraphPoint,
@@ -108,9 +108,12 @@ async def api_graph() -> JSONResponse:
 
 
 @app.get("/api/history")
-async def api_history() -> JSONResponse:
+async def api_history(start: str | None = None, end: str | None = None) -> JSONResponse:
     try:
-        rows = await asyncio.to_thread(get_all_readings)
+        if start and end:
+            rows = await asyncio.to_thread(get_readings_in_range, start, end)
+        else:
+            rows = await asyncio.to_thread(get_all_readings)
         points = [GraphPoint(value=val, timestamp=ts) for ts, val in rows]
 
         thresholds = _cached_thresholds or GlucoseThresholds(

@@ -136,6 +136,18 @@ class TestApiHistory:
         assert data["thresholds"]["target_low"] == 70
 
     @pytest.mark.anyio()
+    @patch("app.main.get_readings_in_range")
+    async def test_with_date_range(self, mock_range: MagicMock, client: AsyncClient) -> None:
+        main_mod._cached_thresholds = _make_thresholds()
+        mock_range.return_value = [("2026-02-24T10:00:00", 120.0)]
+
+        resp = await client.get("/api/history?start=2026-02-24&end=2026-02-25")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["points"]) == 1
+        mock_range.assert_called_once_with("2026-02-24", "2026-02-25")
+
+    @pytest.mark.anyio()
     @patch("app.main.get_all_readings")
     async def test_uses_default_thresholds(self, mock_get: MagicMock, client: AsyncClient) -> None:
         main_mod._cached_thresholds = None

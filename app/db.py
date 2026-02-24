@@ -52,3 +52,16 @@ def get_all_readings() -> list[tuple[str, float]]:
     ).fetchall()
     conn.close()
     return rows
+
+
+def get_readings_in_range(start: str, end: str) -> list[tuple[str, float]]:
+    """Return readings where start <= timestamp < end, ordered newest-first."""
+    conn = get_connection()
+    rows: list[tuple[str, float]] = conn.execute(
+        "SELECT timestamp, value FROM readings "
+        "WHERE timestamp >= ? AND timestamp < ? "
+        "ORDER BY timestamp DESC",
+        (start, end),
+    ).fetchall()
+    conn.close()
+    return rows

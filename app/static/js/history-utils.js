@@ -51,12 +51,8 @@ export function dayStats(entries, thresholds) {
   return { avg, lo, hi, pct };
 }
 
-export function calcA1C(points, now = new Date()) {
-  const weekAgo = new Date(now);
-  weekAgo.setDate(now.getDate() - 7);
-
+export function calcA1C(points) {
   const sorted = points
-    .filter(p => new Date(p.timestamp) >= weekAgo)
     .map(p => ({ t: new Date(p.timestamp).getTime(), v: p.value }))
     .sort((a, b) => a.t - b.t);
 

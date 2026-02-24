@@ -120,14 +120,12 @@ describe('dayStats', () => {
 });
 
 describe('calcA1C', () => {
-  const now = new Date('2026-02-24T12:00:00');
-
-  it('calculates time-weighted A1C from recent points', () => {
+  it('calculates time-weighted A1C from points', () => {
     const points = [
       { timestamp: '2026-02-22T08:00:00', value: 120 },
       { timestamp: '2026-02-24T08:00:00', value: 120 },
     ];
-    const result = calcA1C(points, now);
+    const result = calcA1C(points);
     expect(result).not.toBeNull();
     expect(result.count).toBe(2);
     expect(result.avg).toBe(120);
@@ -141,7 +139,7 @@ describe('calcA1C', () => {
       { timestamp: '2026-02-23T00:01:00', value: 100 },
       { timestamp: '2026-02-23T12:01:00', value: 200 },
     ];
-    const result = calcA1C(points, now);
+    const result = calcA1C(points);
     expect(result.count).toBe(3);
     // Simple avg would be (100+100+200)/3 = 133
     // Time-weighted: 1 min at 100 + 720 min at avg 150 ≈ 150
@@ -150,25 +148,17 @@ describe('calcA1C', () => {
     expect(result.a1c).toBe('6.9');
   });
 
-  it('returns null when no points are within the last week', () => {
-    const points = [
-      { timestamp: '2026-02-10T08:00:00', value: 120 },
-    ];
-    expect(calcA1C(points, now)).toBeNull();
+  it('returns null for empty array', () => {
+    expect(calcA1C([])).toBeNull();
   });
 
-  it('filters out points older than 7 days', () => {
+  it('handles single point', () => {
     const points = [
       { timestamp: '2026-02-24T08:00:00', value: 200 },
-      { timestamp: '2026-02-10T08:00:00', value: 100 },
     ];
-    const result = calcA1C(points, now);
+    const result = calcA1C(points);
     expect(result.count).toBe(1);
     expect(result.avg).toBe(200);
-  });
-
-  it('returns null for empty array', () => {
-    expect(calcA1C([], now)).toBeNull();
   });
 
   it('computes correct A1C for known average', () => {
@@ -177,8 +167,18 @@ describe('calcA1C', () => {
       { timestamp: '2026-02-23T08:00:00', value: 154 },
       { timestamp: '2026-02-24T08:00:00', value: 154 },
     ];
-    const result = calcA1C(points, now);
+    const result = calcA1C(points);
     expect(result.a1c).toBe('7.0');
+  });
+
+  it('uses all points passed in without date filtering', () => {
+    const points = [
+      { timestamp: '2025-01-01T08:00:00', value: 100 },
+      { timestamp: '2026-02-24T08:00:00', value: 200 },
+    ];
+    const result = calcA1C(points);
+    expect(result.count).toBe(2);
+    expect(result.avg).toBe(150);
   });
 });
 
