@@ -217,47 +217,50 @@
         .map(e => ({ x: new Date(e.timestamp), y: e.value }))
         .sort((a, b) => a.x - b.x);
 
-      const xMin = new Date(data[0].x);
-      xMin.setHours(0, 0, 0, 0);
-      const xMax = new Date(data[0].x);
-      xMax.setHours(23, 59, 59, 999);
+      const urgentLowLine = {
+        data: data.map(p => ({ x: p.x, y: thresholds.urgent_low })),
+        borderColor: 'rgba(239, 68, 68, 0.4)',
+        borderWidth: 1,
+        borderDash: [2, 3],
+        pointRadius: 0,
+        pointHitRadius: 0,
+        fill: false,
+      };
 
-      const threshLine = (yVal, color) => ({
-        data: [{ x: xMin, y: yVal }, { x: xMax, y: yVal }],
-        borderColor: color,
+      const lowLine = {
+        data: data.map(p => ({ x: p.x, y: thresholds.target_low })),
+        borderColor: 'rgba(234, 179, 8, 0.3)',
         borderWidth: 1,
         borderDash: [4, 4],
         pointRadius: 0,
         pointHitRadius: 0,
         fill: false,
-      });
+      };
+
+      const highLine = {
+        data: data.map(p => ({ x: p.x, y: thresholds.target_high })),
+        borderColor: 'rgba(239, 68, 68, 0.3)',
+        borderWidth: 1,
+        borderDash: [4, 4],
+        pointRadius: 0,
+        pointHitRadius: 0,
+        fill: false,
+      };
+
+      const mainLine = {
+        data: data,
+        borderColor: '#6366f1',
+        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+        borderWidth: 2,
+        pointRadius: 0,
+        pointHitRadius: 8,
+        fill: true,
+        tension: 0.3,
+      };
 
       return new Chart(canvas.getContext('2d'), {
         type: 'line',
-        data: {
-          datasets: [
-            {
-              data: data,
-              borderColor: '#6366f1',
-              backgroundColor: 'rgba(99, 102, 241, 0.08)',
-              borderWidth: 2,
-              pointRadius: 3,
-              pointBackgroundColor: data.map(p => {
-                if (p.y >= thresholds.target_high) return '#ef4444';
-                if (p.y <= thresholds.urgent_low) return '#ef4444';
-                if (p.y <= thresholds.target_low) return '#eab308';
-                return '#6366f1';
-              }),
-              pointBorderWidth: 0,
-              pointHitRadius: 10,
-              fill: true,
-              tension: 0.35,
-            },
-            threshLine(thresholds.urgent_low, 'rgba(239, 68, 68, 0.35)'),
-            threshLine(thresholds.target_low, 'rgba(234, 179, 8, 0.3)'),
-            threshLine(thresholds.target_high, 'rgba(239, 68, 68, 0.3)'),
-          ],
-        },
+        data: { datasets: [mainLine, urgentLowLine, lowLine, highLine] },
         options: {
           responsive: true,
           maintainAspectRatio: false,
@@ -272,10 +275,6 @@
               displayColors: false,
               filter: (item) => item.datasetIndex === 0,
               callbacks: {
-                title: (items) => {
-                  const d = new Date(items[0].parsed.x);
-                  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                },
                 label: (ctx) => `${ctx.parsed.y} mg/dL`,
               },
             },
@@ -283,18 +282,16 @@
           scales: {
             x: {
               type: 'time',
-              min: xMin,
-              max: xMax,
-              time: { unit: 'hour', displayFormats: { hour: 'HH:mm' }, stepSize: 3 },
-              grid: { color: 'rgba(42,42,58,0.4)' },
-              ticks: { color: '#8888a0', font: { size: 10 } },
+              time: { unit: 'hour', displayFormats: { hour: 'HH:mm' } },
+              grid: { color: 'rgba(42,42,58,0.5)' },
+              ticks: { color: '#8888a0', maxTicksLimit: 6 },
               border: { color: '#2a2a3a' },
             },
             y: {
               min: 40,
               max: 300,
-              grid: { color: 'rgba(42,42,58,0.4)' },
-              ticks: { color: '#8888a0', font: { size: 10 } },
+              grid: { color: 'rgba(42,42,58,0.5)' },
+              ticks: { color: '#8888a0' },
               border: { color: '#2a2a3a' },
             },
           },
