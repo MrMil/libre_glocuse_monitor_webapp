@@ -4,11 +4,12 @@ import logging
 import threading
 import time
 import warnings
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Callable, TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
-from requests.exceptions import HTTPError
+if TYPE_CHECKING:
+    from datetime import datetime
 
 from pylibrelinkup import PyLibreLinkUp
 from pylibrelinkup.exceptions import RedirectError
@@ -18,6 +19,7 @@ from pylibrelinkup.models.data import (
     Patient,
     Trend,
 )
+from requests.exceptions import HTTPError
 
 from app.config import settings
 
@@ -28,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Cached, shared client – authenticates once and reuses the session token
+# Cached, shared client - authenticates once and reuses the session token
 # ---------------------------------------------------------------------------
 
 _client: PyLibreLinkUp | None = None
@@ -45,9 +47,7 @@ def _get_client_and_patient() -> tuple[PyLibreLinkUp, Patient]:
     with _lock:
         now = time.monotonic()
         need_auth = (
-            _client is None
-            or _client.token is None
-            or now - _last_auth_ts > _AUTH_TTL_SECONDS
+            _client is None or _client.token is None or now - _last_auth_ts > _AUTH_TTL_SECONDS
         )
 
         if need_auth:
@@ -108,6 +108,7 @@ def _with_reauth[T](fn: _CallableFn[T]) -> T:
 # Data classes
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class GlucoseThresholds:
     urgent_low: int
@@ -155,6 +156,7 @@ class GraphPoint:
 # Public API
 # ---------------------------------------------------------------------------
 
+
 def get_current_reading() -> GlucoseReading:
     def _fetch(client: PyLibreLinkUp, patient: Patient) -> GlucoseReading:
         latest = client.latest(patient_identifier=patient)
@@ -182,7 +184,9 @@ def get_graph_data() -> tuple[GlucoseReading, list[GraphPoint], GlucoseThreshold
         )
         logger.info(
             "Patient thresholds: urgent_low=%d, low=%d, high=%d",
-            thresholds.urgent_low, thresholds.target_low, thresholds.target_high,
+            thresholds.urgent_low,
+            thresholds.target_low,
+            thresholds.target_high,
         )
 
         current = GlucoseReading.from_measurement(connection.glucose_measurement)
@@ -228,7 +232,9 @@ def collect_readings() -> tuple[list[tuple[str, float]], GlucoseThresholds]:
 
         logger.info(
             "Collected %d graph + %d logbook = %d unique readings",
-            len(response.data.graph_data), len(logbook), len(rows),
+            len(response.data.graph_data),
+            len(logbook),
+            len(rows),
         )
         return rows, thresholds
 

@@ -49,11 +49,15 @@ async def _background_poller() -> None:
         await asyncio.sleep(POLL_INTERVAL_SECONDS)
 
 
+_background_task: asyncio.Task[None] | None = None
+
+
 @app.on_event("startup")
 async def startup() -> None:
+    global _background_task
     init_db()
     await asyncio.to_thread(_poll_and_store)
-    asyncio.create_task(_background_poller())
+    _background_task = asyncio.create_task(_background_poller())
 
 
 @app.get("/", response_class=HTMLResponse)
