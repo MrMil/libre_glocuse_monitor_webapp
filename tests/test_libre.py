@@ -278,7 +278,7 @@ class TestCollectReadings:
         client.logbook.return_value = [logbook_entry]
 
         rows, _thresholds = collect_readings()
-        assert len(rows) == 3
+        assert len(rows) == 4  # 1 current + 2 graph + 1 logbook
         timestamps = {r[0] for r in rows}
         assert "2026-02-23T12:00:00" in timestamps
 
@@ -295,7 +295,7 @@ class TestCollectReadings:
         client.logbook.return_value = [dup_entry]
 
         rows, _ = collect_readings()
-        assert len(rows) == 1
+        assert len(rows) == 2  # 1 current + 1 graph (logbook is a dup of graph)
 
     @patch("app.libre._get_client_and_patient")
     def test_empty_logbook(self, mock_get: MagicMock) -> None:
@@ -308,7 +308,7 @@ class TestCollectReadings:
         client.logbook.return_value = []
 
         rows, _ = collect_readings()
-        assert len(rows) == 3
+        assert len(rows) == 3  # 1 current + 3 graph (current deduped with graph[2] at 10:00)
 
 
 class TestReauthOnExpiredToken:

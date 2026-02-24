@@ -217,6 +217,11 @@ def collect_readings() -> tuple[list[tuple[str, float]], GlucoseThresholds]:
         rows: list[tuple[str, float]] = []
         seen: set[str] = set()
 
+        current = connection.glucose_measurement
+        current_ts = current.timestamp.isoformat()
+        seen.add(current_ts)
+        rows.append((current_ts, current.value))
+
         for m in response.data.graph_data:
             ts = m.timestamp.isoformat()
             if ts not in seen:
@@ -231,7 +236,7 @@ def collect_readings() -> tuple[list[tuple[str, float]], GlucoseThresholds]:
                 rows.append((ts, m.value))
 
         logger.info(
-            "Collected %d graph + %d logbook = %d unique readings",
+            "Collected 1 current + %d graph + %d logbook = %d unique readings",
             len(response.data.graph_data),
             len(logbook),
             len(rows),
