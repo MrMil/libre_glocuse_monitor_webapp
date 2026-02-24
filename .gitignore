@@ -5,6 +5,7 @@ __pycache__/
 .mypy_cache/
 .coverage
 .pytest_cache/
+node_modules/
 sugar.db
 .vscode/
 server/

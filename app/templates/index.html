@@ -259,39 +259,11 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-  <script>
+  <script type="module">
+    import { glucoseClass, glucoseColor, trendLabel, formatTime } from '/static/js/glucose-utils.js';
+
     let chart = null;
     let thresholds = { urgent_low: 55, target_low: 70, target_high: 180 };
-
-    function glucoseClass(value) {
-      if (value >= thresholds.target_high) return 'high';
-      if (value <= thresholds.urgent_low) return 'urgent-low';
-      if (value <= thresholds.target_low) return 'low';
-      return 'normal';
-    }
-
-    function trendLabel(name) {
-      const map = {
-        'DOWN_FAST': 'Falling fast',
-        'DOWN_SLOW': 'Falling',
-        'STABLE': 'Stable',
-        'UP_SLOW': 'Rising',
-        'UP_FAST': 'Rising fast',
-      };
-      return map[name] || name;
-    }
-
-    function formatTime(iso) {
-      const d = new Date(iso);
-      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
-
-    function glucoseColor(value) {
-      if (value >= thresholds.target_high) return '#ef4444';
-      if (value <= thresholds.urgent_low) return '#ef4444';
-      if (value <= thresholds.target_low) return '#eab308';
-      return '#22c55e';
-    }
 
     function renderChart(points) {
       const ctx = document.getElementById('chart').getContext('2d');
@@ -400,8 +372,8 @@
         }
 
         const c = json.current;
-        const cls = glucoseClass(c.value);
-        const color = glucoseColor(c.value);
+        const cls = glucoseClass(c.value, thresholds);
+        const color = glucoseColor(c.value, thresholds);
 
         document.getElementById('glucose-value').textContent = Math.round(c.value);
         document.getElementById('glucose-value').className = 'glucose-value ' + cls;

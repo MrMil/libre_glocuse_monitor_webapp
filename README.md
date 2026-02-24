@@ -26,6 +26,27 @@ uv run uvicorn app.main:app --reload
 
 Then open http://localhost:8000.
 
+## Tests
+
+Install test dependencies:
+
+```bash
+uv sync          # includes Python dev dependencies (pytest, pytest-cov, etc.)
+npm install      # installs Vitest for JavaScript tests
+```
+
+Python tests (with verbose output and coverage):
+
+```bash
+uv run pytest -v --cov=app --cov-report=term-missing
+```
+
+JavaScript tests (with verbose output):
+
+```bash
+npx vitest run --reporter=verbose
+```
+
 ## Type checking
 
 ```bash

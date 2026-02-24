@@ -97,6 +97,48 @@
       padding: 2rem;
     }
 
+    .week-summary {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 1.5rem;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 2.5rem;
+    }
+
+    .a1c-block {
+      text-align: center;
+    }
+
+    .a1c-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 0.3rem;
+    }
+
+    .a1c-value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      line-height: 1.1;
+    }
+
+    .a1c-unit {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .a1c-detail {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+    }
+
     .day-card {
       background: var(--card);
       border: 1px solid var(--border);
@@ -165,39 +207,10 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-  <script>
+  <script type="module">
+    import { formatDate, groupByDay, dayStats, calcA1C, a1cColor } from '/static/js/history-utils.js';
+
     let thresholds = { urgent_low: 55, target_low: 70, target_high: 180 };
-
-    function formatDate(iso) {
-      const d = new Date(iso);
-      const today = new Date();
-      const yesterday = new Date();
-      yesterday.setDate(today.getDate() - 1);
-
-      if (d.toDateString() === today.toDateString()) return 'Today';
-      if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
-      return d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
-    }
-
-    function groupByDay(entries) {
-      const groups = new Map();
-      for (const e of entries) {
-        const key = new Date(e.timestamp).toDateString();
-        if (!groups.has(key)) groups.set(key, []);
-        groups.get(key).push(e);
-      }
-      return groups;
-    }
-
-    function dayStats(entries) {
-      const values = entries.map(e => e.value);
-      const avg = Math.round(values.reduce((a, b) => a + b, 0) / values.length);
-      const lo = Math.round(Math.min(...values));
-      const hi = Math.round(Math.max(...values));
-      const inRange = values.filter(v => v > thresholds.target_low && v < thresholds.target_high);
-      const pct = Math.round((inRange.length / values.length) * 100);
-      return { avg, lo, hi, pct };
-    }
 
     function createDayChart(canvas, entries) {
       const data = entries
@@ -289,6 +302,27 @@
       });
     }
 
+    function renderWeekSummary(container, points) {
+      const result = calcA1C(points);
+      if (!result) return;
+
+      const color = a1cColor(parseFloat(result.a1c));
+      const card = document.createElement('div');
+      card.className = 'week-summary';
+      card.innerHTML = `
+        <div class="a1c-block">
+          <div class="a1c-label">Est. A1C (7 days)</div>
+          <div class="a1c-value" style="color: ${color}">${result.a1c}<span class="a1c-unit">%</span></div>
+          <div class="a1c-detail">from ${result.count} readings</div>
+        </div>
+        <div class="a1c-block">
+          <div class="a1c-label">Avg Glucose (7 days)</div>
+          <div class="a1c-value" style="color: ${color}">${result.avg}<span class="a1c-unit"> mg/dL</span></div>
+        </div>
+      `;
+      container.appendChild(card);
+    }
+
     function render(points) {
       const container = document.getElementById('content');
       container.innerHTML = '';
@@ -300,10 +334,12 @@
         return;
       }
 
+      renderWeekSummary(container, points);
+
       for (const [, items] of groups) {
         if (items.length < 2) continue;
 
-        const stats = dayStats(items);
+        const stats = dayStats(items, thresholds);
         const card = document.createElement('div');
         card.className = 'day-card';
 
