@@ -1,0 +1,30 @@
+[project]
+name = "sugar"
+version = "0.1.0"
+description = "Glucose monitor web app using LibreLinkUp"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "aiosqlite>=0.22.1",
+    "fastapi>=0.132.0",
+    "jinja2>=3.1.6",
+    "pydantic-settings>=2.13.1",
+    "pylibrelinkup>=0.9.1",
+    "uvicorn[standard]>=0.41.0",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.19.1",
+    "types-requests>=2.32.4.20260107",
+]
+
+[tool.mypy]
+strict = true
+plugins = ["pydantic.mypy"]
+warn_return_any = true
+warn_unused_configs = true
+
+[[tool.mypy.overrides]]
+module = ["pylibrelinkup.*"]
+ignore_missing_imports = true
