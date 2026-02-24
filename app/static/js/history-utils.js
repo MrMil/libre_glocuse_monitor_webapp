@@ -19,12 +19,35 @@ export function groupByDay(entries) {
 }
 
 export function dayStats(entries, thresholds) {
-  const values = entries.map(e => e.value);
-  const avg = Math.round(values.reduce((a, b) => a + b, 0) / values.length);
-  const lo = Math.round(Math.min(...values));
-  const hi = Math.round(Math.max(...values));
-  const inRange = values.filter(v => v > thresholds.target_low && v < thresholds.target_high);
-  const pct = Math.round((inRange.length / values.length) * 100);
+  const sorted = entries
+    .map(e => ({ t: new Date(e.timestamp).getTime(), v: e.value }))
+    .sort((a, b) => a.t - b.t);
+
+  const lo = Math.round(Math.min(...sorted.map(p => p.v)));
+  const hi = Math.round(Math.max(...sorted.map(p => p.v)));
+
+  if (sorted.length < 2) {
+    const v = sorted[0].v;
+    const inRange = v > thresholds.target_low && v < thresholds.target_high;
+    return { avg: Math.round(v), lo, hi, pct: inRange ? 100 : 0 };
+  }
+
+  let weightedSum = 0;
+  let inRangeDuration = 0;
+  let totalDuration = 0;
+
+  for (let i = 1; i < sorted.length; i++) {
+    const dt = sorted[i].t - sorted[i - 1].t;
+    const segAvg = (sorted[i].v + sorted[i - 1].v) / 2;
+    weightedSum += segAvg * dt;
+    totalDuration += dt;
+    if (segAvg > thresholds.target_low && segAvg < thresholds.target_high) {
+      inRangeDuration += dt;
+    }
+  }
+
+  const avg = Math.round(weightedSum / totalDuration);
+  const pct = Math.round((inRangeDuration / totalDuration) * 100);
   return { avg, lo, hi, pct };
 }
 
@@ -32,13 +55,30 @@ export function calcA1C(points, now = new Date()) {
   const weekAgo = new Date(now);
   weekAgo.setDate(now.getDate() - 7);
 
-  const weekPoints = points.filter(p => new Date(p.timestamp) >= weekAgo);
-  if (weekPoints.length === 0) return null;
+  const sorted = points
+    .filter(p => new Date(p.timestamp) >= weekAgo)
+    .map(p => ({ t: new Date(p.timestamp).getTime(), v: p.value }))
+    .sort((a, b) => a.t - b.t);
 
-  const values = weekPoints.map(p => p.value);
-  const avg = values.reduce((a, b) => a + b, 0) / values.length;
+  if (sorted.length === 0) return null;
+
+  if (sorted.length === 1) {
+    const a1c = (sorted[0].v + 46.7) / 28.7;
+    return { a1c: a1c.toFixed(1), avg: Math.round(sorted[0].v), count: 1 };
+  }
+
+  let weightedSum = 0;
+  let totalDuration = 0;
+
+  for (let i = 1; i < sorted.length; i++) {
+    const dt = sorted[i].t - sorted[i - 1].t;
+    weightedSum += (sorted[i].v + sorted[i - 1].v) / 2 * dt;
+    totalDuration += dt;
+  }
+
+  const avg = weightedSum / totalDuration;
   const a1c = (avg + 46.7) / 28.7;
-  return { a1c: a1c.toFixed(1), avg: Math.round(avg), count: weekPoints.length };
+  return { a1c: a1c.toFixed(1), avg: Math.round(avg), count: sorted.length };
 }
 
 export function a1cColor(a1c) {

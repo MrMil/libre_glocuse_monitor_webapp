@@ -50,11 +50,11 @@ describe('groupByDay', () => {
 });
 
 describe('dayStats', () => {
-  it('computes average, range, and in-target percentage', () => {
+  it('computes time-weighted average, range, and in-target percentage', () => {
     const entries = [
-      { value: 100 },
-      { value: 120 },
-      { value: 140 },
+      { timestamp: '2026-02-24T08:00:00', value: 100 },
+      { timestamp: '2026-02-24T10:00:00', value: 120 },
+      { timestamp: '2026-02-24T12:00:00', value: 140 },
     ];
     const stats = dayStats(entries, thresholds);
     expect(stats.avg).toBe(120);
@@ -63,20 +63,35 @@ describe('dayStats', () => {
     expect(stats.pct).toBe(100);
   });
 
-  it('excludes boundary values from in-target count', () => {
+  it('weights sparse periods equally to dense periods', () => {
     const entries = [
-      { value: 70 },
-      { value: 180 },
-      { value: 100 },
+      { timestamp: '2026-02-24T08:00:00', value: 100 },
+      { timestamp: '2026-02-24T08:01:00', value: 100 },
+      { timestamp: '2026-02-24T20:01:00', value: 200 },
     ];
     const stats = dayStats(entries, thresholds);
-    expect(stats.pct).toBe(33);
+    // Simple avg would be (100+100+200)/3 = 133
+    // Time-weighted: 1 min at 100 + 720 min at avg 150 ≈ 150
+    expect(stats.avg).toBe(150);
+    expect(stats.lo).toBe(100);
+    expect(stats.hi).toBe(200);
+  });
+
+  it('computes in-range percentage based on segment averages', () => {
+    const entries = [
+      { timestamp: '2026-02-24T08:00:00', value: 60 },
+      { timestamp: '2026-02-24T12:00:00', value: 60 },
+      { timestamp: '2026-02-24T16:00:00', value: 200 },
+    ];
+    const stats = dayStats(entries, thresholds);
+    // Seg1: avg=60, out of range (≤70). Seg2: avg=130, in range.
+    expect(stats.pct).toBe(50);
   });
 
   it('handles all out-of-range values', () => {
     const entries = [
-      { value: 200 },
-      { value: 250 },
+      { timestamp: '2026-02-24T08:00:00', value: 200 },
+      { timestamp: '2026-02-24T12:00:00', value: 250 },
     ];
     const stats = dayStats(entries, thresholds);
     expect(stats.pct).toBe(0);
@@ -84,8 +99,22 @@ describe('dayStats', () => {
 
   it('uses provided thresholds', () => {
     const wide = { urgent_low: 40, target_low: 50, target_high: 300 };
-    const entries = [{ value: 200 }, { value: 250 }];
+    const entries = [
+      { timestamp: '2026-02-24T08:00:00', value: 200 },
+      { timestamp: '2026-02-24T12:00:00', value: 250 },
+    ];
     const stats = dayStats(entries, wide);
+    expect(stats.pct).toBe(100);
+  });
+
+  it('handles single entry', () => {
+    const entries = [
+      { timestamp: '2026-02-24T08:00:00', value: 120 },
+    ];
+    const stats = dayStats(entries, thresholds);
+    expect(stats.avg).toBe(120);
+    expect(stats.lo).toBe(120);
+    expect(stats.hi).toBe(120);
     expect(stats.pct).toBe(100);
   });
 });
@@ -93,18 +122,32 @@ describe('dayStats', () => {
 describe('calcA1C', () => {
   const now = new Date('2026-02-24T12:00:00');
 
-  it('calculates A1C from recent points', () => {
+  it('calculates time-weighted A1C from recent points', () => {
     const points = [
+      { timestamp: '2026-02-22T08:00:00', value: 120 },
       { timestamp: '2026-02-24T08:00:00', value: 120 },
-      { timestamp: '2026-02-23T08:00:00', value: 140 },
-      { timestamp: '2026-02-22T08:00:00', value: 100 },
     ];
     const result = calcA1C(points, now);
     expect(result).not.toBeNull();
-    expect(result.count).toBe(3);
+    expect(result.count).toBe(2);
     expect(result.avg).toBe(120);
     // (120 + 46.7) / 28.7 = 5.8
     expect(result.a1c).toBe('5.8');
+  });
+
+  it('weights by time duration', () => {
+    const points = [
+      { timestamp: '2026-02-23T00:00:00', value: 100 },
+      { timestamp: '2026-02-23T00:01:00', value: 100 },
+      { timestamp: '2026-02-23T12:01:00', value: 200 },
+    ];
+    const result = calcA1C(points, now);
+    expect(result.count).toBe(3);
+    // Simple avg would be (100+100+200)/3 = 133
+    // Time-weighted: 1 min at 100 + 720 min at avg 150 ≈ 150
+    expect(result.avg).toBe(150);
+    // (150 + 46.7) / 28.7 = 6.85... ≈ "6.9"
+    expect(result.a1c).toBe('6.9');
   });
 
   it('returns null when no points are within the last week', () => {
@@ -131,6 +174,7 @@ describe('calcA1C', () => {
   it('computes correct A1C for known average', () => {
     // avg=154 => (154 + 46.7) / 28.7 = 6.994... => "7.0"
     const points = [
+      { timestamp: '2026-02-23T08:00:00', value: 154 },
       { timestamp: '2026-02-24T08:00:00', value: 154 },
     ];
     const result = calcA1C(points, now);

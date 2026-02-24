@@ -385,7 +385,8 @@
         document.getElementById('range-text').textContent =
           thresholds.target_low + '–' + thresholds.target_high;
 
-        renderChart(json.graph);
+        const graphWithCurrent = [...json.graph, { value: c.value, timestamp: c.timestamp }];
+        renderChart(graphWithCurrent);
 
         document.getElementById('loading').style.display = 'none';
         document.getElementById('content').style.display = 'flex';
