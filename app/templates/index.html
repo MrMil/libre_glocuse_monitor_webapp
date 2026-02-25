@@ -262,6 +262,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
   <script type="module">
     import { glucoseClass, glucoseColor, trendLabel, formatTime } from '/static/js/glucose-utils.js';
+    import { toDateTimeStr } from '/static/js/date-utils.js';
 
     let chart = null;
     let thresholds = { urgent_low: 55, target_low: 70, target_high: 180 };
@@ -367,8 +368,8 @@
       try {
         const now = new Date();
         const twelveHoursAgo = new Date(now.getTime() - 12 * 60 * 60 * 1000);
-        const start = twelveHoursAgo.toISOString().slice(0, 19);
-        const end = new Date(now.getTime() + 60000).toISOString().slice(0, 19);
+        const start = toDateTimeStr(twelveHoursAgo);
+        const end = toDateTimeStr(new Date(now.getTime() + 60000));
 
         const [graphResp, histResp] = await Promise.all([
           fetch('/api/graph'),
