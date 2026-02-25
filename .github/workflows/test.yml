@@ -17,11 +17,40 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Lint
+      - name: Ruff lint
         run: uv run ruff check app/ tests/
+
+      - name: Ruff format check
+        run: uv run ruff format --check app/ tests/
 
       - name: Type check
         run: uv run mypy app/
+
+      - name: Trailing whitespace
+        run: git diff --check HEAD || { echo "Trailing whitespace found"; exit 1; }
+
+      - name: End-of-file fixer check
+        run: |
+          bad=0
+          for f in $(git ls-files -- '*.py' '*.js' '*.ts' '*.html' '*.css' '*.yml' '*.yaml' '*.toml' '*.json' '*.md'); do
+            if [ -s "$f" ] && [ "$(tail -c1 "$f" | wc -l)" -eq 0 ]; then
+              echo "No newline at end of file: $f"
+              bad=1
+            fi
+          done
+          exit $bad
+
+      - name: Check YAML
+        run: python -c "import yaml, glob; [yaml.safe_load(open(f)) for f in glob.glob('**/*.yml', recursive=True) + glob.glob('**/*.yaml', recursive=True)]"
+
+      - name: Check TOML
+        run: python -c "import tomllib, glob; [tomllib.load(open(f,'rb')) for f in glob.glob('**/*.toml', recursive=True)]"
+
+      - name: Debug statements
+        run: uv run ruff check --select T10 app/ tests/
+
+      - name: Check merge conflict markers
+        run: "! grep -rn '<<<<<<<\\|=======\\|>>>>>>>' --include='*.py' --include='*.js' --include='*.html' --include='*.yml' --include='*.toml' app/ tests/ || { echo 'Merge conflict markers found'; exit 1; }"
 
       - name: Run tests
         run: uv run pytest -v --cov=app --cov-report=term-missing --cov-fail-under=100
