@@ -72,7 +72,7 @@ LibreLinkUp account. Available values:
 | `LA` | Latin America |
 
 If you are unsure which region to use, it is the one matching the country you
-chose during LibreLinkUp account creation. For example, Israel uses `EU`.
+chose during LibreLinkUp account creation.
 
 ## Install
 
@@ -107,10 +107,4 @@ JavaScript tests (with verbose output):
 
 ```bash
 npx vitest run --reporter=verbose
-```
-
-## Type checking
-
-```bash
-uv run mypy app/
 ```
