@@ -268,7 +268,9 @@
 
     function renderChart(points) {
       const ctx = document.getElementById('chart').getContext('2d');
-      const data = points.map(p => ({ x: new Date(p.timestamp), y: p.value }));
+      const data = points
+        .map(p => ({ x: new Date(p.timestamp), y: p.value }))
+        .sort((a, b) => a.x - b.x);
 
       const urgentLowLine = {
         data: data.map(p => ({ x: p.x, y: thresholds.urgent_low })),
@@ -363,8 +365,17 @@
 
     async function fetchData() {
       try {
-        const resp = await fetch('/api/graph');
-        const json = await resp.json();
+        const now = new Date();
+        const twelveHoursAgo = new Date(now.getTime() - 12 * 60 * 60 * 1000);
+        const start = twelveHoursAgo.toISOString().slice(0, 19);
+        const end = new Date(now.getTime() + 60000).toISOString().slice(0, 19);
+
+        const [graphResp, histResp] = await Promise.all([
+          fetch('/api/graph'),
+          fetch(`/api/history?start=${start}&end=${end}`),
+        ]);
+        const json = await graphResp.json();
+        const histJson = await histResp.json();
 
         if (json.error) throw new Error(json.error);
 
@@ -386,8 +397,9 @@
         document.getElementById('range-text').textContent =
           thresholds.target_low + '–' + thresholds.target_high;
 
-        const graphWithCurrent = [...json.graph, { value: c.value, timestamp: c.timestamp }];
-        renderChart(graphWithCurrent);
+        const dbPoints = (histJson.points || []).map(p => ({ value: p.value, timestamp: p.timestamp }));
+        const chartData = [...dbPoints, { value: c.value, timestamp: c.timestamp }];
+        renderChart(chartData);
 
         document.getElementById('loading').style.display = 'none';
         document.getElementById('content').style.display = 'flex';
