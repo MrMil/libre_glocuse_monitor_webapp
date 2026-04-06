@@ -296,7 +296,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
   <script type="module">
-    import { formatDate, groupByDay, dayStats, calcA1C, a1cColor } from '/static/js/history-utils.js';
+    import { formatDate, a1cColor } from '/static/js/history-utils.js';
     import { toDateStr, todayStr, addDays } from '/static/js/date-utils.js';
 
     let thresholds = { urgent_low: 55, target_low: 70, target_high: 180 };
@@ -472,67 +472,91 @@
       });
     }
 
-    function renderSummary(container, points, label) {
-      const result = calcA1C(points);
-      if (!result) return;
-
-      const color = a1cColor(parseFloat(result.a1c));
-      const card = document.createElement('div');
-      card.className = 'period-summary';
-      card.innerHTML = `
-        <div class="a1c-block">
-          <div class="a1c-label">Est. A1C (${label})</div>
-          <div class="a1c-value" style="color: ${color}">${result.a1c}<span class="a1c-unit">%</span></div>
-          <div class="a1c-detail">from ${result.count} readings</div>
-        </div>
-        <div class="a1c-block">
-          <div class="a1c-label">Avg Glucose (${label})</div>
-          <div class="a1c-value" style="color: ${color}">${result.avg}<span class="a1c-unit"> mg/dL</span></div>
-        </div>
-      `;
-      container.appendChild(card);
-    }
+    const worker = new Worker('/static/js/history-worker.js');
+    let renderGeneration = 0;
 
     function render(points) {
+      const gen = ++renderGeneration;
       const container = document.getElementById('content');
       container.innerHTML = '';
 
-      const groups = groupByDay(points);
-
-      if (groups.size === 0) {
+      if (points.length === 0) {
         container.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:3rem;">No historical data available for this period.</div>';
         return;
       }
 
-      renderSummary(container, points, periodLabel());
+      // Show a placeholder summary while the worker computes
+      const summaryEl = document.createElement('div');
+      summaryEl.className = 'period-summary';
+      summaryEl.innerHTML = `
+        <div class="a1c-block">
+          <div class="a1c-label">Est. A1C (${periodLabel()})</div>
+          <div class="a1c-value" style="color:var(--text-muted)">...</div>
+        </div>
+        <div class="a1c-block">
+          <div class="a1c-label">Avg Glucose (${periodLabel()})</div>
+          <div class="a1c-value" style="color:var(--text-muted)">...</div>
+        </div>
+      `;
+      container.appendChild(summaryEl);
 
-      for (const [, items] of groups) {
-        if (items.length < 2) continue;
+      const daysContainer = document.createElement('div');
+      container.appendChild(daysContainer);
 
-        const stats = dayStats(items, thresholds);
-        const card = document.createElement('div');
-        card.className = 'day-card';
+      worker.onmessage = async function(e) {
+        if (gen !== renderGeneration) return;
 
-        const canvasId = 'chart-' + Math.random().toString(36).slice(2, 8);
+        if (e.data.type === 'summary') {
+          const result = e.data.a1c;
+          if (result) {
+            const color = a1cColor(parseFloat(result.a1c));
+            summaryEl.innerHTML = `
+              <div class="a1c-block">
+                <div class="a1c-label">Est. A1C (${periodLabel()})</div>
+                <div class="a1c-value" style="color: ${color}">${result.a1c}<span class="a1c-unit">%</span></div>
+                <div class="a1c-detail">from ${result.count} readings</div>
+              </div>
+              <div class="a1c-block">
+                <div class="a1c-label">Avg Glucose (${periodLabel()})</div>
+                <div class="a1c-value" style="color: ${color}">${result.avg}<span class="a1c-unit"> mg/dL</span></div>
+              </div>
+            `;
+          }
+        }
 
-        card.innerHTML = `
-          <div class="day-card-header">
-            <div class="day-card-title">${formatDate(items[0].timestamp)}</div>
-            <div class="day-stats">
-              <span>Avg <span class="stat-val">${stats.avg}</span></span>
-              <span>Range <span class="stat-val">${stats.lo}–${stats.hi}</span></span>
-              <span>In target <span class="stat-val green">${stats.pct}%</span></span>
-              <span><span class="stat-val">${items.length}</span> pts</span>
-            </div>
-          </div>
-          <div class="day-chart-container">
-            <canvas id="${canvasId}"></canvas>
-          </div>
-        `;
+        if (e.data.type === 'days') {
+          for (const { items, stats } of e.data.days) {
+            if (gen !== renderGeneration) return;
 
-        container.appendChild(card);
-        createDayChart(document.getElementById(canvasId), items);
-      }
+            const card = document.createElement('div');
+            card.className = 'day-card';
+            const canvasId = 'chart-' + Math.random().toString(36).slice(2, 8);
+
+            card.innerHTML = `
+              <div class="day-card-header">
+                <div class="day-card-title">${formatDate(items[0].timestamp)}</div>
+                <div class="day-stats">
+                  <span>Avg <span class="stat-val">${stats.avg}</span></span>
+                  <span>Range <span class="stat-val">${stats.lo}–${stats.hi}</span></span>
+                  <span>In target <span class="stat-val green">${stats.pct}%</span></span>
+                  <span><span class="stat-val">${items.length}</span> pts</span>
+                </div>
+              </div>
+              <div class="day-chart-container">
+                <canvas id="${canvasId}"></canvas>
+              </div>
+            `;
+
+            daysContainer.appendChild(card);
+            createDayChart(document.getElementById(canvasId), items);
+
+            // Yield to browser between chart renders to keep UI responsive
+            await new Promise(r => requestAnimationFrame(r));
+          }
+        }
+      };
+
+      worker.postMessage({ points, thresholds });
     }
 
     async function loadData() {
